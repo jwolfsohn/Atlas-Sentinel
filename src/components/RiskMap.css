@@ -1,0 +1,64 @@
+.risk-map-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.port-popup h4 {
+  margin: 0 0 0.5rem 0;
+  color: #1a1f3a;
+  font-size: 1rem;
+}
+
+.port-popup p {
+  margin: 0.25rem 0;
+  color: #555;
+  font-size: 0.85rem;
+}
+
+.route-popup {
+  min-width: 200px;
+}
+
+.route-popup h4 {
+  margin: 0 0 0.5rem 0;
+  color: #1a1f3a;
+  font-size: 1rem;
+}
+
+.route-popup .risk-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.route-popup .risk-high {
+  background: rgba(239, 68, 68, 0.2);
+  color: #dc2626;
+}
+
+.route-popup .risk-medium {
+  background: rgba(245, 158, 11, 0.2);
+  color: #d97706;
+}
+
+.route-popup .risk-low {
+  background: rgba(16, 185, 129, 0.2);
+  color: #059669;
+}
+
+.route-popup p {
+  margin: 0.25rem 0;
+  color: #555;
+  font-size: 0.85rem;
+}
+
+.alert-indicator {
+  color: #dc2626 !important;
+  font-weight: 600;
+  margin-top: 0.5rem !important;
+}
+
