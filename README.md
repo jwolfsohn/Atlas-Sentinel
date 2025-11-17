@@ -70,12 +70,6 @@ Terminal 2 - Frontend:
 npm run dev
 ```
 
-The application will be available at:
-
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-
 ## Project Structure
 
 ```
