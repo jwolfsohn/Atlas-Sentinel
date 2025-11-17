@@ -26,6 +26,12 @@ build/
 .env
 .env.local
 
+# Data files (hidden from git)
+.data/
+*.data/
+data_cache/
+*.json.bak
+
 # OS
 .DS_Store
 Thumbs.db

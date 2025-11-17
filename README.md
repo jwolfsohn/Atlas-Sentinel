@@ -78,6 +78,24 @@ AtlasSentinel/
 ├── backend/          # Python ML backend
 │   ├── ml/          # ML models and pipelines
 │   ├── data/        # Data ingestion
-│   └── api/         # FastAPI endpoints
+│   │   ├── pipelines/  # Data ingestion pipelines
+│   │   ├── ontology.py # Knowledge graph
+│   │   └── data_simulator.py # Fake data generator
+│   ├── api/         # FastAPI endpoints
+│   └── config.py     # Environment configuration
+├── .data/           # Data storage (gitignored)
+│   ├── ports/       # Port traffic data
+│   ├── weather/     # Weather alerts
+│   └── news/        # News articles
 └── public/          # Static assets
 ```
+
+## Data Storage
+
+All data files are stored in the `.data/` directory, which is gitignored. This includes:
+
+- Port traffic cache and history
+- Weather alert records
+- News article archives
+
+See `DATA_PIPELINES.md` for detailed documentation on the data ingestion system.

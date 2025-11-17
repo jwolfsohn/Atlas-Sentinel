@@ -15,6 +15,8 @@ from backend.ml.sentiment_analyzer import SentimentAnalyzer
 from backend.ml.congestion_analyzer import CongestionAnalyzer
 from backend.data.ontology import SupplyChainOntology, Port, Route, RiskLevel
 from backend.data.data_simulator import DataSimulator
+from backend.data.pipelines.pipeline_orchestrator import PipelineOrchestrator
+from backend.config import DATA_DIR
 
 app = FastAPI(title="Atlas Sentinel API", version="1.0.0")
 
@@ -33,6 +35,7 @@ sentiment_analyzer = SentimentAnalyzer()
 congestion_analyzer = CongestionAnalyzer()
 ontology = SupplyChainOntology()
 data_simulator = DataSimulator()
+pipeline_orchestrator = PipelineOrchestrator(data_dir=DATA_DIR)
 
 # Initialize ontology with sample data
 def initialize_ontology():
@@ -73,13 +76,37 @@ def _weather_severity_value(severity: str) -> int:
 @app.get("/")
 async def root():
     """Root endpoint"""
-    return {"message": "Atlas Sentinel API", "status": "running"}
+    return {
+        "message": "Atlas Sentinel API", 
+        "status": "running",
+        "data_directory": DATA_DIR,
+        "data_summary": pipeline_orchestrator.get_data_summary()
+    }
+
+@app.get("/api/data/summary")
+async def get_data_summary():
+    """Get summary of stored data"""
+    return pipeline_orchestrator.get_data_summary()
+
+@app.post("/api/data/refresh")
+async def refresh_data():
+    """Force refresh all data caches"""
+    pipeline_orchestrator.ingest_all_data(force_refresh=True)
+    return {"message": "Data refreshed", "timestamp": datetime.now().isoformat()}
 
 @app.get("/api/routes")
 async def get_routes():
     """Get all routes with current risk assessments"""
-    # Generate fresh data for all routes
-    routes_data = data_simulator.generate_all_routes_data()
+    # Use pipeline orchestrator to ingest data (uses cached data when available)
+    routes_data = []
+    for route in data_simulator.routes:
+        route_data = pipeline_orchestrator.ingest_route_data(route['route_id'])
+        if route_data:
+            routes_data.append(route_data)
+    
+    # Fallback to simulator if pipeline returns empty
+    if not routes_data:
+        routes_data = data_simulator.generate_all_routes_data()
     
     results = []
     for route_data in routes_data:
@@ -209,7 +236,11 @@ async def get_ports():
     ports_data = []
     
     for port_id in ontology.ports.keys():
-        traffic = data_simulator.generate_port_traffic(port_id)
+        # Use pipeline to get port traffic (uses cache)
+        traffic = pipeline_orchestrator.port_traffic.ingest_port_traffic(port_id)
+        if not traffic:
+            # Fallback to simulator
+            traffic = data_simulator.generate_port_traffic(port_id)
         congestion_metrics = congestion_analyzer.compute_congestion_index(
             traffic['vessel_count'],
             traffic['capacity'],
@@ -235,7 +266,11 @@ async def get_ports():
 @app.get("/api/route/{route_id}")
 async def get_route_details(route_id: str):
     """Get detailed information for a specific route"""
-    route_data = data_simulator.generate_route_data(route_id)
+    # Use pipeline orchestrator to get route data
+    route_data = pipeline_orchestrator.ingest_route_data(route_id)
+    if not route_data:
+        # Fallback to simulator
+        route_data = data_simulator.generate_route_data(route_id)
     
     # Full analysis
     origin_sentiment = sentiment_analyzer.analyze_articles(route_data['origin_port']['news'])
