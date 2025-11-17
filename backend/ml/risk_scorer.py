@@ -1,12 +1,15 @@
 """
 Risk Scoring Engine for Supply Chain Disruption Prediction
-Combines multiple data modalities to compute risk scores
+Uses ML models for risk prediction and combines multiple data modalities
 """
 
 import numpy as np
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 import pandas as pd
+
+from backend.ml.ml_risk_model import MLRiskModel
+from backend.ml.time_series_forecaster import TimeSeriesForecaster
 
 
 class RiskScorer:
@@ -22,15 +25,17 @@ class RiskScorer:
                  weather_weight: float = 0.35,
                  sentiment_weight: float = 0.30,
                  congestion_weight: float = 0.25,
-                 historical_weight: float = 0.10):
+                 historical_weight: float = 0.10,
+                 use_ml: bool = True):
         """
-        Initialize risk scorer with configurable weights
+        Initialize risk scorer with ML models
         
         Args:
-            weather_weight: Weight for weather-based risk (0-1)
-            sentiment_weight: Weight for news sentiment risk (0-1)
-            congestion_weight: Weight for port congestion risk (0-1)
-            historical_weight: Weight for historical pattern risk (0-1)
+            weather_weight: Weight for weather-based risk (0-1) - used for component breakdown
+            sentiment_weight: Weight for news sentiment risk (0-1) - used for component breakdown
+            congestion_weight: Weight for port congestion risk (0-1) - used for component breakdown
+            historical_weight: Weight for historical pattern risk (0-1) - used for component breakdown
+            use_ml: Whether to use ML model for final risk prediction
         """
         self.weather_weight = weather_weight
         self.sentiment_weight = sentiment_weight
@@ -47,6 +52,15 @@ class RiskScorer:
         # Risk thresholds
         self.high_risk_threshold = 0.7
         self.medium_risk_threshold = 0.4
+        
+        # Initialize ML models
+        self.use_ml = use_ml
+        if use_ml:
+            self.ml_model = MLRiskModel()
+            self.forecaster = TimeSeriesForecaster()
+        else:
+            self.ml_model = None
+            self.forecaster = None
         
     def compute_weather_risk(self, weather_data: Dict) -> float:
         """
@@ -181,27 +195,34 @@ class RiskScorer:
         Returns:
             Dict with risk score and component breakdown
         """
-        # Compute individual risk components
+        # Compute individual risk components (for breakdown)
         weather_risk = self.compute_weather_risk(weather_data)
         sentiment_risk = self.compute_sentiment_risk(sentiment_data)
         congestion_risk = self.compute_congestion_risk(congestion_data)
         historical_risk = self.compute_historical_risk(route_id, historical_data)
         
-        # Weighted combination
-        total_risk = (
-            weather_risk * self.weather_weight +
-            sentiment_risk * self.sentiment_weight +
-            congestion_risk * self.congestion_weight +
-            historical_risk * self.historical_weight
-        )
-        
-        # Determine risk level
-        if total_risk >= self.high_risk_threshold:
-            risk_level = 'high'
-        elif total_risk >= self.medium_risk_threshold:
-            risk_level = 'medium'
+        # Use ML model for final risk prediction if enabled
+        if self.use_ml and self.ml_model:
+            total_risk = self.ml_model.predict_risk(
+                weather_data, sentiment_data, congestion_data, historical_data
+            )
+            risk_level = self.ml_model.predict_risk_level(total_risk)
         else:
-            risk_level = 'low'
+            # Fallback to weighted combination
+            total_risk = (
+                weather_risk * self.weather_weight +
+                sentiment_risk * self.sentiment_weight +
+                congestion_risk * self.congestion_weight +
+                historical_risk * self.historical_weight
+            )
+            
+            # Determine risk level
+            if total_risk >= self.high_risk_threshold:
+                risk_level = 'high'
+            elif total_risk >= self.medium_risk_threshold:
+                risk_level = 'medium'
+            else:
+                risk_level = 'low'
         
         return {
             'route_id': route_id,
@@ -226,7 +247,7 @@ class RiskScorer:
                                  route_risks: List[Dict],
                                  network_graph: Optional[Dict] = None) -> List[Dict]:
         """
-        Predict cascading delays across the supply chain network
+        Predict cascading delays using ML-based time series forecasting
         
         Args:
             route_risks: List of route risk assessments
@@ -235,6 +256,11 @@ class RiskScorer:
         Returns:
             List of routes with predicted delay impacts
         """
+        if self.use_ml and self.forecaster:
+            # Use ML-based forecasting
+            return self.forecaster.forecast_delay_cascade(route_risks, network_graph)
+        
+        # Fallback to rule-based prediction
         results = []
         
         for route_risk in route_risks:
@@ -246,14 +272,12 @@ class RiskScorer:
             elif route_risk['risk_level'] == 'medium':
                 base_delay_hours = 6 + (route_risk['total_risk'] - 0.4) * 30
             
-            # Cascading effects (simplified - would use graph traversal in production)
+            # Cascading effects
             cascading_delay = 0
             if network_graph:
-                # Find dependent routes
                 route_id = route_risk['route_id']
                 if route_id in network_graph:
                     for dependent_route in network_graph[route_id]:
-                        # Dependent routes get 30% of upstream delay
                         cascading_delay += base_delay_hours * 0.3
             
             total_delay = base_delay_hours + cascading_delay
